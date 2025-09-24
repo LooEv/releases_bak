@@ -77,6 +77,7 @@
 * 仓库可能很大，备份时请注意 GitHub 仓库大小限制（建议只备份重要项目）。
 * 如果目标仓库被删除或设为私有，脚本会跳过并在日志中提示。
 * `backup-repos.md` 只有在 `backup-repos.url` 修改后才会重新生成。
+* **需要在仓库 Settings → Actions → General → Workflow permissions 中开启 `Read and write permissions`，否则无法推送备份结果。**
 
 生成的 `backup-repos.md` 大概是这样的：
 
