@@ -1,0 +1,159 @@
+name: Backup Releases
+
+on:
+  workflow_dispatch:   # 手动触发
+  schedule:
+    - cron: '0 0 * * *'   # 每天 北京时间 8:00 执行
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+
+      - name: Process each repo
+        run: |
+          # 遍历 backup-repos.url，忽略空行和注释
+          grep -vE '^\s*#|^\s*$' backup-repos.url | while read -r url; do
+            url=$(echo "$url" | xargs)  # 去掉前后空格
+            echo "Processing URL: $url"
+
+            # ========== 1. 解析 URL ==========
+            # 去掉 query 参数 和 末尾斜杠
+            clean_url=$(echo "$url" | sed 's/[?#].*$//' | sed 's:/*$::')
+
+            # 提取 github.com/ 后的路径
+            path=$(echo "$clean_url" | sed -n 's|.*github.com/\(.*\)|\1|p')
+
+            # 分割 path
+            IFS='/' read -r owner name maybe_tree branch <<<"$path"
+
+            # 如果没有 tree，就清空 branch
+            if [ "$maybe_tree" != "tree" ]; then
+              branch=""
+            fi
+
+            if [ -z "$owner" ] || [ -z "$name" ]; then
+              echo "⚠️ 无法解析 $url, 跳过."
+              continue
+            fi
+
+            echo "=== Processing $owner/$name (branch: ${branch:-default}) ==="
+
+            # ========== 2. 检查仓库是否存在 ==========
+            repo_info=$(gh api repos/$owner/$name 2>/dev/null || true)
+            if [ -z "$repo_info" ]; then
+              echo "⚠️ 仓库 $owner/$name 不存在或已删除，跳过."
+              continue
+            fi
+
+            # ========== 3. 获取 release ==========
+            release=$(gh api repos/$owner/$name/releases/latest 2>/dev/null || true)
+            message=$(echo "$release" | jq -r '.message // empty')
+
+            if [ -n "$release" ] && [ "$message" != "Not Found" ]; then
+              # 有 release
+              tag=$(echo "$release" | jq -r '.tag_name')
+              tarball=$(echo "$release" | jq -r '.tarball_url')
+              zipball=$(echo "$release" | jq -r '.zipball_url')
+              assets=$(echo "$release" | jq -c '.assets')
+
+              path="releases/$owner/$name/$tag"
+              if [ -d "$path" ]; then
+                echo "✅ Release $owner/$name@$tag 已存在，跳过."
+                continue
+              fi
+
+              mkdir -p "$path"
+
+              echo "⬇️ 下载 release tarball & zip..."
+              curl -sSL "$tarball" -o "$path/source.tar.gz" || true
+              curl -sSL "$zipball" -o "$path/source.zip" || true
+
+              echo "$assets" | jq -c '.[]' | while read -r asset; do
+                url=$(echo "$asset" | jq -r '.browser_download_url')
+                fname=$(echo "$asset" | jq -r '.name')
+                echo "⬇️ 下载资源: $fname"
+                curl -sSL "$url" -o "$path/$fname" || true
+              done
+
+            else
+              # ========== 4. 没有 release，下载指定分支 ==========
+              if [ -z "$branch" ]; then
+                branch=$(echo "$repo_info" | jq -r '.default_branch')
+              fi
+
+              safe_branch=$(echo "$branch" | tr '/' '-')
+
+              echo "ℹ️ 没有 release，备份分支: $branch"
+
+              commit=$(gh api repos/$owner/$name/commits/$branch --jq '.sha' 2>/dev/null || true)
+              if [ -z "$commit" ]; then
+                echo "⚠️ 分支 $branch 不存在，跳过."
+                continue
+              fi
+
+              short_commit=${commit:0:7}
+              path="releases/$owner/$name/${safe_branch}/$short_commit"
+              if [ -d "$path" ]; then
+                echo "✅ 分支备份 $owner/$name@$branch@$short_commit 已存在，跳过."
+                continue
+              fi
+
+              mkdir -p "$path"
+              curl -sSL "https://github.com/$owner/$name/archive/$commit.tar.gz" -o "$path/$short_commit.tar.gz" || true
+              curl -sSL "https://github.com/$owner/$name/archive/$commit.zip" -o "$path/$short_commit.zip" || true
+            fi
+          done
+
+      - name: Generate backup-repos.md
+        run: |
+          md_file="backup-repos.md"
+          txt_file="backup-repos.url"
+
+          # 获取 backup-repos.url 的修改时间
+          txt_time=$(stat -c %Y "$txt_file")
+          md_time=0
+          if [ -f "$md_file" ]; then
+            md_time=$(stat -c %Y "$md_file")
+          fi
+
+          if [ ! -f "$md_file" ] || [ "$txt_time" -gt "$md_time" ]; then
+            echo "# 📦 Backup Repositories" > "$md_file"
+            echo "" >> "$md_file"
+            echo "下面是所有正在备份的 GitHub 仓库，以及它们的关键信息。" >> "$md_file"
+            echo "" >> "$md_file"
+            echo "| 仓库 | 描述 | Star | Fork | 最近更新 |" >> "$md_file"
+            echo "|------|------|------|------|----------|" >> "$md_file"
+
+            grep -vE '^\s*#|^\s*$' "$txt_file" | while read -r url; do
+              url=$(echo "$url" | xargs)
+              clean_url=$(echo "$url" | sed 's/[?#].*$//' | sed 's:/*$::')
+              path=$(echo "$clean_url" | sed -n 's|.*github.com/\(.*\)|\1|p')
+              IFS='/' read -r owner name _ <<<"$path"
+
+              repo_info=$(gh api repos/$owner/$name 2>/dev/null || true)
+              if [ -n "$repo_info" ]; then
+                desc=$(echo "$repo_info" | jq -r '.description // "-"')
+                stars=$(echo "$repo_info" | jq -r '.stargazers_count')
+                forks=$(echo "$repo_info" | jq -r '.forks_count')
+                updated=$(echo "$repo_info" | jq -r '.updated_at' | cut -d'T' -f1)
+                echo "| [$owner/$name](https://github.com/$owner/$name) | $desc | ⭐ $stars | 🍴 $forks | $updated |" >> "$md_file"
+              else
+                echo "| [$owner/$name](https://github.com/$owner/$name) | ❌ 仓库不存在 | - | - | - |" >> "$md_file"
+              fi
+            done
+          else
+            echo "⚠️ backup-repos.md 已经是最新的，跳过生成."
+          fi
+
+      - name: Commit and push
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add .
+          git commit -m "Backup new releases & update repo list [skip ci]" || echo "No changes"
+          git push
