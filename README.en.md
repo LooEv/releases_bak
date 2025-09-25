@@ -48,7 +48,7 @@ It can run on a **daily schedule** or be triggered manually. It automatically fe
 
 ## 🚀 Usage
 
-1. **Create a new repository** (recommended to make it private to avoid using public resources).
+1. **Create a new repository**.
 2. In the new repository, create `.github/workflows/backup.yml` and copy the GitHub Action workflow provided by this project.
 3. Add a `backup-repos.url` file in the root directory with the repositories you want to back up, for example:
 
