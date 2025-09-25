@@ -1,6 +1,6 @@
 # 📦 GitHub Repository Backup Tool
 
-[中文版 README](README.md)
+[中文](README.md)
 
 This is an automated **GitHub Actions**–based backup tool.
 It can run on a **daily schedule** or be triggered manually. It automatically fetches the **latest Release** or **a specified branch source code** from the repositories you define and stores them in this repository for long-term archiving.
@@ -81,6 +81,22 @@ After execution, you’ll find in your repository:
 * If a target repository is deleted or made private, the script will skip it and log a warning.
 * `backup-repos.md` will only be regenerated if `backup-repos.url` is modified.
 * **You must enable `Read and write permissions` in Repository → Settings → Actions → General → Workflow permissions, otherwise the workflow won’t be able to push backup results.**
+* GitHub imposes file size restrictions:
+  - **>50MB**: you will receive a warning when pushing.
+  - **>100MB**: pushes will be blocked entirely.
+* To avoid these limits, the script uses the `7z` tool to split files larger than **50MB** into volumes (each ≤49MB).  
+  - Split files are typically named like:  
+    ```
+    xxx.tar.gz.7z.001
+    xxx.tar.gz.7z.002
+    ...
+    ```
+  - To extract (requires [7-Zip](https://www.7-zip.org/) or a compatible tool):  
+    ```bash
+    7z x xxx.tar.gz.7z.001
+    ```
+    This will automatically join all parts and restore the original file.  
+  - On Windows, you can simply use the **7-Zip GUI**: right-click the `.001` file → `Extract Here`.
 
 The generated [backup-repos.md](backup-repos.md) looks like this:
 
