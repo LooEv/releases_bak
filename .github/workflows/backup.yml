@@ -109,6 +109,17 @@ jobs:
             fi
           done
 
+          # ========== 5. 检查并拆分大文件 ==========
+          find releases -type f -size +50M | while read -r bigfile; do
+            echo "⚠️ 检测到大文件: $bigfile, 进行多卷压缩..."
+            dir=$(dirname "$bigfile")
+            base=$(basename "$bigfile")
+            # 压缩成不超过49MB的分卷
+            7z a -v49m "$dir/${base}.7z" "$bigfile"
+            # 删除原始大文件
+            rm -f "$bigfile"
+          done
+
       - name: Generate backup-repos.md
         run: |
           md_file="backup-repos.md"
