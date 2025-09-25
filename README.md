@@ -1,6 +1,6 @@
 # 📦 GitHub 仓库备份工具
 
-[English README](README.en.md)
+[English](README.en.md)
 
 这是一个基于 **GitHub Actions** 的自动化仓库备份工具。
 它可以每天定时或手动触发，自动拉取你指定的 GitHub 仓库的 **最新 Release** 或 **指定分支源码** 并保存到本仓库中，方便长期归档。
@@ -81,6 +81,22 @@
 * 如果目标仓库被删除或设为私有，脚本会跳过并在日志中提示。
 * `backup-repos.md` 只有在 `backup-repos.url` 修改后才会重新生成。
 * **需要在仓库 Settings → Actions → General → Workflow permissions 中开启 `Read and write permissions`，否则无法推送备份结果。**
+* GitHub 对大文件有体积限制：
+  - **>50MB** 推送时会收到警告。
+  - **>100MB** 会被阻止推送。
+* 为避免触发限制，脚本使用了 `7z` 工具对超过 **50MB** 的文件进行分卷压缩（每卷 ≤49MB）。  
+  - 分卷文件名通常类似于：  
+    ```
+    xxx.tar.gz.7z.001
+    xxx.tar.gz.7z.002
+    ...
+    ```
+  - 解压方法（需先安装 [7-Zip](https://www.7-zip.org/) 或兼容工具）：  
+    ```bash
+    7z x xxx.tar.gz.7z.001
+    ```
+    会自动拼接所有分卷并恢复原始文件。  
+  - Windows 用户可以直接用 **7-Zip GUI**，右键 `.001` 文件 → `解压到当前文件夹` 即可。
 
 生成的 [backup-repos.md](backup-repos.md) 大概是这样的：
 
