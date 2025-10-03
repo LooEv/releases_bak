@@ -125,41 +125,30 @@ jobs:
           md_file="backup-repos.md"
           txt_file="backup-repos.url"
 
-          # 获取 backup-repos.url 的修改时间
-          txt_time=$(stat -c %Y "$txt_file")
-          md_time=0
-          if [ -f "$md_file" ]; then
-            md_time=$(stat -c %Y "$md_file")
-          fi
+          echo "# 📦 Backup Repositories" > "$md_file"
+          echo "" >> "$md_file"
+          echo "下面是所有正在备份的 GitHub 仓库，以及它们的关键信息。" >> "$md_file"
+          echo "" >> "$md_file"
+          echo "| 仓库 | 描述 | Star | Fork | 最近更新 |" >> "$md_file"
+          echo "|------|------|------|------|----------|" >> "$md_file"
 
-          if [ ! -f "$md_file" ] || [ "$txt_time" -gt "$md_time" ]; then
-            echo "# 📦 Backup Repositories" > "$md_file"
-            echo "" >> "$md_file"
-            echo "下面是所有正在备份的 GitHub 仓库，以及它们的关键信息。" >> "$md_file"
-            echo "" >> "$md_file"
-            echo "| 仓库 | 描述 | Star | Fork | 最近更新 |" >> "$md_file"
-            echo "|------|------|------|------|----------|" >> "$md_file"
+          grep -vE '^\s*#|^\s*$' "$txt_file" | while read -r url; do
+            url=$(echo "$url" | xargs)
+            clean_url=$(echo "$url" | sed 's/[?#].*$//' | sed 's:/*$::')
+            path=$(echo "$clean_url" | sed -n 's|.*github.com/\(.*\)|\1|p')
+            IFS='/' read -r owner name _ <<<"$path"
 
-            grep -vE '^\s*#|^\s*$' "$txt_file" | while read -r url; do
-              url=$(echo "$url" | xargs)
-              clean_url=$(echo "$url" | sed 's/[?#].*$//' | sed 's:/*$::')
-              path=$(echo "$clean_url" | sed -n 's|.*github.com/\(.*\)|\1|p')
-              IFS='/' read -r owner name _ <<<"$path"
-
-              repo_info=$(gh api repos/$owner/$name 2>/dev/null || true)
-              if [ -n "$repo_info" ]; then
-                desc=$(echo "$repo_info" | jq -r '.description // "-"')
-                stars=$(echo "$repo_info" | jq -r '.stargazers_count')
-                forks=$(echo "$repo_info" | jq -r '.forks_count')
-                updated=$(echo "$repo_info" | jq -r '.updated_at' | cut -d'T' -f1)
-                echo "| [$owner/$name](https://github.com/$owner/$name) | $desc | ⭐ $stars | 🍴 $forks | $updated |" >> "$md_file"
-              else
-                echo "| [$owner/$name](https://github.com/$owner/$name) | ❌ 仓库不存在 | - | - | - |" >> "$md_file"
-              fi
-            done
-          else
-            echo "⚠️ backup-repos.md 已经是最新的，跳过生成."
-          fi
+            repo_info=$(gh api repos/$owner/$name 2>/dev/null || true)
+            if [ -n "$repo_info" ]; then
+              desc=$(echo "$repo_info" | jq -r '.description // "-"')
+              stars=$(echo "$repo_info" | jq -r '.stargazers_count')
+              forks=$(echo "$repo_info" | jq -r '.forks_count')
+              updated=$(echo "$repo_info" | jq -r '.updated_at' | cut -d'T' -f1)
+              echo "| [$owner/$name](https://github.com/$owner/$name) | $desc | ⭐ $stars | 🍴 $forks | $updated |" >> "$md_file"
+            else
+              echo "| [$owner/$name](https://github.com/$owner/$name) | ❌ 仓库不存在 | - | - | - |" >> "$md_file"
+            fi
+          done
 
       - name: Commit and push
         run: |
