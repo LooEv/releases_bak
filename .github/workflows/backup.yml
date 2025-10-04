@@ -3,7 +3,7 @@ name: Backup Releases
 on:
   workflow_dispatch:   # 手动触发
   schedule:
-    - cron: '0 0 * * *'   # 每天 北京时间 8:00 执行
+    - cron: '30 22 * * *'   # 每天 北京时间 8:00 执行，设置为 utc 0:00:00，发现并不能北京时间8点运行
 
 jobs:
   backup:
@@ -22,8 +22,11 @@ jobs:
             echo "Processing URL: $url"
 
             # ========== 1. 解析 URL ==========
-            # 去掉 query 参数 和 末尾斜杠
-            clean_url=$(echo "$url" | sed 's/[?#].*$//' | sed 's:/*$::')
+            # 去掉 query 参数、末尾斜杠 和 .git 后缀
+            clean_url=$(echo "$url" \
+              | sed 's/[?#].*$//' \
+              | sed 's:/*$::' \
+              | sed 's/\.git$//')
 
             # 提取 github.com/ 后的路径
             path=$(echo "$clean_url" | sed -n 's|.*github.com/\(.*\)|\1|p')
@@ -125,6 +128,30 @@ jobs:
           md_file="backup-repos.md"
           txt_file="backup-repos.url"
 
+          # 统计有效 URL 行数（去掉空行和注释）
+          url_count=$(grep -vE '^\s*#|^\s*$' "$txt_file" | wc -l)
+
+          # 统计 md 表格行数（去掉表头2行）
+          if [ -f "$md_file" ]; then
+            md_count=$(grep -E '^\|' "$md_file" | tail -n +3 | wc -l)
+          else
+            md_count=0
+          fi
+
+          # 获取当前日期号
+          day=$(date +%d)
+          day=$((10#$day))   # 去掉前导零，保证能整除判断
+
+          echo "有效仓库数: $url_count, Markdown 表格数: $md_count, 日期号: $day"
+
+          # 判断条件：如果行数一样 且 日期号不能被5整除 → 跳过更新
+          if [ "$url_count" -eq "$md_count" ] && [ $((day % 5)) -ne 0 ]; then
+            echo "✅ backup-repos.md 无需更新"
+            exit 0
+          fi
+
+          echo "🔄 更新 backup-repos.md ..."
+
           echo "# 📦 Backup Repositories" > "$md_file"
           echo "" >> "$md_file"
           echo "下面是所有正在备份的 GitHub 仓库，以及它们的关键信息。" >> "$md_file"
@@ -134,7 +161,12 @@ jobs:
 
           grep -vE '^\s*#|^\s*$' "$txt_file" | while read -r url; do
             url=$(echo "$url" | xargs)
-            clean_url=$(echo "$url" | sed 's/[?#].*$//' | sed 's:/*$::')
+            # 去掉 query 参数、末尾斜杠 和 .git 后缀
+            clean_url=$(echo "$url" \
+              | sed 's/[?#].*$//' \
+              | sed 's:/*$::' \
+              | sed 's/\.git$//')
+
             path=$(echo "$clean_url" | sed -n 's|.*github.com/\(.*\)|\1|p')
             IFS='/' read -r owner name _ <<<"$path"
 
