@@ -3,7 +3,7 @@ name: Backup Releases
 on:
   workflow_dispatch:   # 手动触发
   schedule:
-    - cron: '30 22 * * *'   # 每天 北京时间 8:00 执行，设置为 utc 0:00:00，发现并不能北京时间8点运行
+    - cron: '41 23 * * *'   # 每天 北京时间 8:00 执行，设置为 utc 0:00:00，发现并不能北京时间8点运行
 
 jobs:
   backup:
@@ -144,8 +144,8 @@ jobs:
 
           echo "有效仓库数: $url_count, Markdown 表格数: $md_count, 日期号: $day"
 
-          # 判断条件：如果行数一样 且 日期号不能被5整除 → 跳过更新
-          if [ "$url_count" -eq "$md_count" ] && [ $((day % 5)) -ne 0 ]; then
+          # 判断条件：如果行数一样 且 日期号不能被10整除 → 跳过更新
+          if [ "$url_count" -eq "$md_count" ] && [ $((day % 10)) -ne 0 ]; then
             echo "✅ backup-repos.md 无需更新"
             exit 0
           fi
