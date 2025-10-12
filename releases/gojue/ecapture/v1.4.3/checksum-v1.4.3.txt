@@ -1,0 +1,6 @@
+e36767b6a3d9b1b7179c5fcdb6094daa6d57d291facbf58f07d78fc6aecde830  ecapture-v1.4.3-android-amd64.tar.gz
+6b9249fc3879a109069092b431d19ffec680af0846a05927c830c678ed65fcad  ecapture-v1.4.3-android-arm64.tar.gz
+1ab36081fcb8793aafbe0530f18efbd5866beba8aae7826569851a622eadfbf4  ecapture-v1.4.3-linux-amd64.tar.gz
+3348be71efb8f999919b6f2fcfd0ec302e50aee0431c53c6c99ff5c7b12b35ef  ecapture-v1.4.3-linux-arm64.tar.gz
+4b2d89c7848a3a9af96c3f945002be5f76f74f3fed150ea8e76b2cd431ca2bea  ecapture_v1.4.3_linux_amd64.deb
+86ed2ac99299d5529dd8d50d6d229a0d0005b12b164b47603af4286142405b4d  ecapture_v1.4.3_linux_arm64.deb
